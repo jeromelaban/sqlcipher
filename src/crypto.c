@@ -49,6 +49,18 @@ static void codec_vdbe_return_static_string(Parse *pParse, const char *zLabel, c
   sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 1);
 }
 
+void _OutputDebugString(const char *lpOutputString, ...)
+{
+	int nBuf;
+	char szBuffer[4096]; // get rid of this hard-coded buffer
+	va_list args;
+	va_start(args, lpOutputString);
+	nBuf = vsnprintf(szBuffer, 4095, lpOutputString, args);
+	OutputDebugString(szBuffer);
+	va_end(args);
+}
+
+
 static int codec_set_btree_to_codec_pagesize(sqlite3 *db, Db *pDb, codec_ctx *ctx) {
   int rc, page_sz, reserve_sz; 
 

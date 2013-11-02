@@ -766,7 +766,7 @@ static struct win_syscall {
 #define osUnlockFileEx ((BOOL(WINAPI*)(HANDLE,DWORD,DWORD,DWORD, \
         LPOVERLAPPED))aSyscall[56].pCurrent)
 
-#if SQLITE_OS_WINCE || !defined(SQLITE_OMIT_WAL)
+#if SQLITE_OS_WINCE || (!SQLITE_OS_WINRT && !defined(SQLITE_OMIT_WAL))
   { "UnmapViewOfFile",         (SYSCALL)UnmapViewOfFile,         0 },
 #else
   { "UnmapViewOfFile",         (SYSCALL)0,                       0 },
@@ -829,7 +829,7 @@ static struct win_syscall {
 #define osGetFileInformationByHandleEx ((BOOL(WINAPI*)(HANDLE, \
         FILE_INFO_BY_HANDLE_CLASS,LPVOID,DWORD))aSyscall[64].pCurrent)
 
-#if SQLITE_OS_WINRT && !defined(SQLITE_OMIT_WAL)
+#if SQLITE_OS_WINCE || (!SQLITE_OS_WINRT && !defined(SQLITE_OMIT_WAL))
   { "MapViewOfFileFromApp",    (SYSCALL)MapViewOfFileFromApp,    0 },
 #else
   { "MapViewOfFileFromApp",    (SYSCALL)0,                       0 },
@@ -893,7 +893,7 @@ static struct win_syscall {
 
 #define osGetProcessHeap ((HANDLE(WINAPI*)(VOID))aSyscall[72].pCurrent)
 
-#if SQLITE_OS_WINRT && !defined(SQLITE_OMIT_WAL)
+#if SQLITE_OS_WINRT && !defined(SQLITE_OMIT_WAL) && WINAPI_FAMILY != WINAPI_FAMILY_PHONE_APP
   { "CreateFileMappingFromApp", (SYSCALL)CreateFileMappingFromApp, 0 },
 #else
   { "CreateFileMappingFromApp", (SYSCALL)0,                      0 },

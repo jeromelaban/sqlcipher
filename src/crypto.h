@@ -98,7 +98,7 @@
 
 
 #ifdef CODEC_DEBUG
-#define CODEC_TRACE(X)  {printf X;fflush(stdout);}
+#define CODEC_TRACE(X)  { _OutputDebugString X;fflush(stdout);}
 #else
 #define CODEC_TRACE(X)
 #endif

@@ -203,10 +203,18 @@ SET TOOLPATH=%gawk.exe_PATH%;%tclsh85.exe_PATH%
 %_VECHO% ToolPath = '%TOOLPATH%'
 
 REM
-REM NOTE: Check for MSVC 2012 because the Windows SDK directory handling is
-REM       slightly different for that version.
+REM NOTE: Check for MSVC 2012/2013 because the Windows SDK directory handling
+REM       is slightly different for those versions.
 REM
 IF "%VisualStudioVersion%" == "11.0" (
+  REM
+  REM NOTE: If the Windows SDK library path has already been set, do not set
+  REM       it to something else later on.
+  REM
+  IF NOT DEFINED NSDKLIBPATH (
+    SET SET_NSDKLIBPATH=1
+  )
+) ELSE IF "%VisualStudioVersion%" == "12.0" (
   REM
   REM NOTE: If the Windows SDK library path has already been set, do not set
   REM       it to something else later on.
@@ -348,10 +356,23 @@ FOR %%P IN (%PLATFORMS%) DO (
         IF DEFINED SET_NSDKLIBPATH (
           IF DEFINED WindowsPhoneKitDir (
             CALL :fn_CopyVariable WindowsPhoneKitDir NSDKLIBPATH
-            CALL :fn_AppendVariable NSDKLIBPATH \lib\x86
+	    
+	    rem set NMAKE_ARGS=%NMAKE_ARGS% USE_RC=0
+
+            rem IF "%VisualStudioVersion%" == "12.0" (
+            rem   CALL :fn_AppendVariable NSDKLIBPATH \lib\winv6.3\um\x86
+            rem ) ELSE (
+            rem   CALL :fn_AppendVariable NSDKLIBPATH \lib\win8\um\x86
+            rem )
+	    
           ) ELSE IF DEFINED WindowsSdkDir (
             CALL :fn_CopyVariable WindowsSdkDir NSDKLIBPATH
-            CALL :fn_AppendVariable NSDKLIBPATH \lib\win8\um\x86
+
+            IF "%VisualStudioVersion%" == "12.0" (
+              CALL :fn_AppendVariable NSDKLIBPATH \lib\winv6.3\um\x86
+            ) ELSE (
+              CALL :fn_AppendVariable NSDKLIBPATH \lib\win8\um\x86
+            )
           )
         )
 

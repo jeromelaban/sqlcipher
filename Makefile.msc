@@ -54,6 +54,10 @@ USE_RC = 1
 FOR_WINRT = 0
 !ENDIF
 
+!IFNDEF FOR_WINPHONE
+FOR_WINPHONE = 0
+!ENDIF
+
 # Set this non-0 to skip attempting to look for and/or link with the Tcl
 # runtime library.
 #
@@ -92,6 +96,14 @@ WIN32HEAP = 0
 #
 !IFNDEF DEBUG
 DEBUG = 0
+!ENDIF
+
+# Enable use of available compiler optimizations?  Normally, this should be
+# non-zero.  Setting this to zero, thus disabling all compiler optimizations,
+# can be useful for testing.
+#
+!IFNDEF OPTIMIZATIONS
+OPTIMIZATIONS = 2
 !ENDIF
 
 # Check for the predefined command macro CC.  This should point to the compiler
@@ -185,7 +197,7 @@ NLTLIBPATHS = "/LIBPATH:$(NCRTLIBPATH)" "/LIBPATH:$(NSDKLIBPATH)"
 # will run on the target platform.  (BCC and TCC are usually the
 # same unless your are cross-compiling.)
 #
-TCC = $(CC) -W3 -DSQLITE_OS_WIN=1 -I$(TOP) -I$(TOP)\src -fp:precise
+TCC = $(CC) -W3 -DSQLITE_OS_WIN=1 -I$(TOP) -I$(TOP)\src -fp:precise /GS /GL /analyze- /Zc:wchar_t /Zi /Gm- /O2 /WX- /Zc:forScope /Gd /Oy- /EHsc 
 RCC = $(RC) -DSQLITE_OS_WIN=1 -I$(TOP) -I$(TOP)\src
 
 # When compiling the library for use in the WinRT environment,
@@ -194,10 +206,17 @@ RCC = $(RC) -DSQLITE_OS_WIN=1 -I$(TOP) -I$(TOP)\src
 # use of Win32 APIs that are specific to Windows 8 and/or WinRT.
 #
 !IF $(FOR_WINRT)!=0
-TCC = $(TCC) -DSQLITE_OS_WINRT=1
-RCC = $(RCC) -DSQLITE_OS_WINRT=1
-TCC = $(TCC) -DWINAPI_FAMILY=WINAPI_FAMILY_APP
-RCC = $(RCC) -DWINAPI_FAMILY=WINAPI_FAMILY_APP
+TCC = $(TCC) -DSQLITE_OS_WINRT=1 -DSQLITE_HAS_CODEC=1 -DOMIT_MEMLOCK=1 -DSQLCIPHER_CRYPTO_LIBTOMCRYPT=1 -I..\libtomcrypt\src\headers
+RCC = $(RCC) -DSQLITE_OS_WINRT=1 -DSQLITE_HAS_CODEC=1 -DOMIT_MEMLOCK=1 -DSQLCIPHER_CRYPTO_LIBTOMCRYPT=1
+
+!IF $(FOR_WINPHONE)!=0
+TCC = $(TCC) -DWINAPI_FAMILY=WINAPI_FAMILY_PHONE_APP -D_USRDLL -D_WINDLL -DLTC_NO_PROTOTYPES -DCODEC_DEBUG
+RCC = $(RCC) -DWINAPI_FAMILY=WINAPI_FAMILY_PHONE_APP -D_USRDLL -D_WINDLL -DLTC_NO_PROTOTYPES
+!ELSE
+TCC = $(TCC) -DWINAPI_FAMILY=WINAPI_FAMILY_APP -D_USRDLL -D_WINDLL
+RCC = $(RCC) -DWINAPI_FAMILY=WINAPI_FAMILY_APP -D_USRDLL -D_WINDLL
+!ENDIF
+
 !ENDIF
 
 # Also, we need to dynamically link to the correct MSVC runtime
@@ -343,11 +362,15 @@ TCLSH_CMD = tclsh85
 
 # Compiler options needed for programs that use the readline() library.
 #
+!IFNDEF READLINE_FLAGS
 READLINE_FLAGS = -DHAVE_READLINE=0
+!ENDIF
 
 # The library that programs using readline() must link against.
 #
+!IFNDEF LIBREADLINE
 LIBREADLINE =
+!ENDIF
 
 # Should the database engine be compiled threadsafe
 #
@@ -397,17 +420,30 @@ RCC = $(RCC) $(OPT_FEATURE_FLAGS)
 TCC = $(TCC) $(OPTS)
 RCC = $(RCC) $(OPTS)
 
-# If symbols are enabled, enable PDBs.
-# If debugging is enabled, disable all optimizations and enable PDBs.
+# If compiling for debugging, add some defines.
 !IF $(DEBUG)>0
-TCC = $(TCC) -Od -D_DEBUG
-BCC = $(BCC) -Od -D_DEBUG
+TCC = $(TCC) -D_DEBUG
+BCC = $(BCC) -D_DEBUG
 RCC = $(RCC) -D_DEBUG
-!ELSE
-TCC = $(TCC) -O2
-BCC = $(BCC) -O2
 !ENDIF
 
+# If optimizations are enabled or disabled (either implicitly or
+# explicitly), add the necessary flags.
+!IF $(DEBUG)>0 || $(OPTIMIZATIONS)==0
+TCC = $(TCC) -Od
+BCC = $(BCC) -Od
+!ELSEIF $(OPTIMIZATIONS)>=3
+TCC = $(TCC) -Ox
+BCC = $(BCC) -Ox
+!ELSEIF $(OPTIMIZATIONS)==2
+TCC = $(TCC) -O2
+BCC = $(BCC) -O2
+!ELSEIF $(OPTIMIZATIONS)==1
+TCC = $(TCC) -O1
+BCC = $(BCC) -O1
+!ENDIF
+
+# If symbols are enabled (or compiling for debugging), enable PDBs.
 !IF $(DEBUG)>0 || $(SYMBOLS)!=0
 TCC = $(TCC) -Zi
 BCC = $(BCC) -Zi
@@ -444,7 +480,42 @@ LTLIBOPTS = /MACHINE:$(PLATFORM)
 # only in the context of an application container.
 #
 !IF $(FOR_WINRT)!=0
+# Phone options
+!IFDEF PLATFORM
+LTLINKOPTS = $(LTLINKOPTS) /LIBPATH:"C:\Program Files (x86)\Windows Phone Kits\8.0\lib\$(PLATFORM)"
+!ELSE
+LTLINKOPTS = $(LTLINKOPTS) /LIBPATH:"C:\Program Files (x86)\Windows Phone Kits\8.0\lib\x86"
+!ENDIF
+
+!IF $(FOR_WINPHONE)!=0
+LTLINKOPTS = $(LTLINKOPTS) /MANIFEST:NO /DLL /NXCOMPAT /DYNAMICBASE /WINMD:NO /SUBSYSTEM:CONSOLE /MANIFESTUAC:"level='asInvoker' uiAccess='false'" "WindowsPhoneCore.lib" "RuntimeObject.lib" "PhoneAppModelHost.lib"
+
+!IF $(DEBUG)>0
+LTLINKOPTS = $(LTLINKOPTS) "..\libtomcrypt\Debug\$(PLATFORM)\libtomcrypt_phone\libtomcrypt_phone.lib"
+!ELSE
+LTLINKOPTS = $(LTLINKOPTS) "..\libtomcrypt\Release\$(PLATFORM)\libtomcrypt_phone\libtomcrypt_phone.lib"
+!ENDIF
+
+!ELSE
 LTLINKOPTS = $(LTLINKOPTS) /APPCONTAINER
+!IF "$(VISUALSTUDIOVERSION)"=="12.0"
+!IF "$(PLATFORM)"=="x86"
+LTLINKOPTS = $(LTLINKOPTS) "/LIBPATH:$(VCINSTALLDIR)\lib\store" ..\libtomcrypt\Release\$(PLATFORM)\libtomcrypt_store\libtomcrypt_store.lib
+!ELSEIF "$(PLATFORM)"=="x64"
+LTLINKOPTS = $(LTLINKOPTS) "/LIBPATH:$(VCINSTALLDIR)\lib\store\amd64" ..\libtomcrypt\Release\$(PLATFORM)\libtomcrypt_store\libtomcrypt_store.lib
+!ELSEIF "$(PLATFORM)"=="ARM"
+LTLINKOPTS = $(LTLINKOPTS) "/LIBPATH:$(VCINSTALLDIR)\lib\store\arm" ..\libtomcrypt\Release\$(PLATFORM)\libtomcrypt_store\libtomcrypt_store.lib
+!ELSE
+LTLINKOPTS = $(LTLINKOPTS) "/LIBPATH:$(VCINSTALLDIR)\lib\store" ..\libtomcrypt\Release\$(PLATFORM)\libtomcrypt_store\libtomcrypt_store.lib
+!ENDIF
+
+# VISUALSTUDIOVERSION == 12.0
+!ENDIF
+
+# FOR_WINPHONE
+!ENDIF
+
+# FOR_WINRT
 !ENDIF
 
 # If either debugging or symbols are enabled, enable PDBs.
@@ -515,6 +586,13 @@ LIBRESOBJS =
 # All of the source code files.
 #
 SRC = \
+  $(TOP)\src\crypto.h \
+  $(TOP)\src\sqlcipher.h \
+  $(TOP)\src\crypto.c \
+  $(TOP)\src\crypto_impl.c \
+	$(TOP)\src\crypto_libtomcrypt.c \
+	$(TOP)\src\crypto_openssl.c \
+	$(TOP)\src\crypto_cc.c \
   $(TOP)\src\alter.c \
   $(TOP)\src\analyze.c \
   $(TOP)\src\attach.c \
@@ -865,7 +943,7 @@ lempar.c:	$(TOP)\src\lempar.c
 	copy $(TOP)\src\lempar.c .
 
 lemon.exe:	$(TOP)\tool\lemon.c lempar.c
-	$(BCC) -Daccess=_access -Fe$@ $(TOP)\tool\lemon.c /link $(NLTLIBPATHS)
+	$(BCC) -Daccess=_access -Fe$@ $(TOP)\tool\lemon.c /link $(NLTLIBPATHS)  /LIBPATH:"C:\Program Files (x86)\Windows Kits\8.1\Lib\winv6.3\um\x86"
 
 # Rules to build individual *.lo files from generated *.c files. This
 # applies to:
@@ -1133,7 +1211,7 @@ sqlite3.h:	$(TOP)\src\sqlite.h.in $(TOP)\manifest.uuid $(TOP)\VERSION
 	$(TCLSH_CMD) $(TOP)\tool\mksqlite3h.tcl $(TOP) > sqlite3.h
 
 mkkeywordhash.exe:	$(TOP)\tool\mkkeywordhash.c
-	$(BCC) -Fe$@ $(OPT_FEATURE_FLAGS) $(OPTS) $(TOP)\tool\mkkeywordhash.c /link $(NLTLIBPATHS)
+	$(BCC) -Fe$@ $(OPT_FEATURE_FLAGS) $(OPTS) $(TOP)\tool\mkkeywordhash.c /link $(NLTLIBPATHS) /LIBPATH:"C:\Program Files (x86)\Windows Kits\8.1\Lib\winv6.3\um\x86"
 
 keywordhash.h:	$(TOP)\tool\mkkeywordhash.c mkkeywordhash.exe
 	.\mkkeywordhash.exe > keywordhash.h
@@ -1260,8 +1338,9 @@ clean:
 	del /Q *.lo *.ilk *.lib *.obj *.pdb sqlite3.exe libsqlite3.lib
 	del /Q *.da *.bb *.bbg gmon.out
 	del /Q sqlite3.h opcodes.c opcodes.h
-	del /Q lemon.exe lempar.c parse.*
-	del /Q mkkeywordhash.exe keywordhash.h
+# Disable these for WinPhone, as the selected SDK cannot always build desktop tooling
+# 	del /Q lemon.exe lempar.c parse.*
+#	del /Q mkkeywordhash.exe keywordhash.h
 	-rmdir /Q/S .deps
 	-rmdir /Q/S .libs
 	-rmdir /Q/S quota2a
